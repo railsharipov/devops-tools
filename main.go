@@ -63,7 +63,8 @@ func main() {
 
 func albUtils() error {
 	var menu = Menu{
-		Label: "Main",
+		Label:  "ALB",
+		IsMain: false,
 		Items: []MenuItem{
 			{Label: "Highest listener rule priority", Action: notImplemented},
 		},
@@ -72,13 +73,25 @@ func albUtils() error {
 }
 
 func ecsUtils() error {
-	fmt.Println("No actions defined for ECS utils")
-	return nil
+	var menu = Menu{
+		Label:  "ECS",
+		IsMain: false,
+		Items: []MenuItem{
+			{Label: "Not implemented", Action: notImplemented},
+		},
+	}
+	return menu.Run()
 }
 
 func eksUtils() error {
-	fmt.Println("No actions defined for EKS utils")
-	return nil
+	var menu = Menu{
+		Label:  "EKS",
+		IsMain: false,
+		Items: []MenuItem{
+			{Label: "Not implemented", Action: notImplemented},
+		},
+	}
+	return menu.Run()
 }
 
 func notImplemented() error {
