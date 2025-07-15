@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+
+	"node40-dev-tools/utils"
 )
 
 type MenuItem struct {
@@ -17,32 +19,27 @@ type Menu struct {
 
 func (menu Menu) Run() error {
 	for {
-		fmt.Printf("\nSelect action:\n")
+		var labels []string
+
+		for _, item := range menu.Items {
+			labels = append(labels, item.Label)
+		}
 		if menu.IsMain {
-			fmt.Printf("0. Exit\n")
+			labels = append(labels, "Exit")
 		} else {
-			fmt.Printf("0. Back\n")
-		}
-		for idx, item := range menu.Items {
-			fmt.Printf("%d. %s\n", idx+1, item.Label)
+			labels = append(labels, "Back")
 		}
 
-		var choice int
-		fmt.Printf("Choice: ")
-		_, err := fmt.Scanf("%d", &choice)
-
+		choice, err := chooseItem(menu.Label, labels)
 		if err != nil {
-			fmt.Printf("Failed scan: %s\n", err)
+			return err
+		}
 
-		} else if choice < 0 || choice > len(menu.Items) {
-			fmt.Printf("Invalid choice: %d\n", choice)
-
-		} else if choice == 0 {
+		if choice == len(labels) {
 			return nil
-
 		} else {
 			if err := menu.Items[choice-1].Action(); err != nil {
-				fmt.Printf("Error: %s\n", err)
+				utils.PrintError(err.Error())
 			}
 		}
 	}
@@ -61,12 +58,73 @@ func main() {
 	menu.Run()
 }
 
+func chooseItem(label string, items []string) (int, error) {
+	for {
+		utils.PrintMenuTitle(label)
+		for idx, item := range items {
+			utils.PrintMenuItem(idx+1, item)
+		}
+
+		var choice int
+		utils.PrintMenuChoice()
+		_, err := fmt.Scanf("%d", &choice)
+
+		if err != nil {
+			utils.PrintError(fmt.Sprintf("Failed scan: %s", err))
+		} else if choice < 1 || choice > len(items) {
+			utils.PrintError(fmt.Sprintf("Invalid choice: %d", choice))
+		} else {
+			return choice, nil
+		}
+	}
+}
+
 func albUtils() error {
 	var menu = Menu{
 		Label:  "ALB",
 		IsMain: false,
 		Items: []MenuItem{
-			{Label: "Highest listener rule priority", Action: notImplemented},
+			{
+				Label: "List ALBs",
+				Action: func() error {
+					albArns, err := utils.ListAlbArns()
+					if err != nil {
+						return err
+					}
+					utils.PrintResultTitle("List of ALBs")
+					for _, albArn := range albArns {
+						utils.PrintResultItem(albArn)
+					}
+					return nil
+				},
+			},
+			{
+				Label: "Highest listener rule priority",
+				Action: func() error {
+					albArns, err := utils.ListAlbArns()
+					if err != nil {
+						return err
+					}
+					albChoice, err := chooseItem("Select an ALB", albArns)
+					if err != nil {
+						return err
+					}
+					listenerArns, err := utils.ListAlbListenerArns(albArns[albChoice-1])
+					if err != nil {
+						return err
+					}
+					listenerChoice, err := chooseItem("Select a listener", listenerArns)
+					if err != nil {
+						return err
+					}
+					highestPriority, err := utils.HighestAlbListenerRulePriority(listenerArns[listenerChoice-1])
+					if err != nil {
+						return err
+					}
+					utils.PrintResultValueInt("Highest listener rule priority", highestPriority)
+					return nil
+				},
+			},
 		},
 	}
 	return menu.Run()
@@ -95,6 +153,6 @@ func eksUtils() error {
 }
 
 func notImplemented() error {
-	fmt.Println("Not implemented")
+	utils.PrintWarning("This feature is not implemented yet")
 	return nil
 }
