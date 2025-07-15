@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"node40-dev-tools/utils"
+	"devops-tools/utils"
 )
 
 type MenuItem struct {
