@@ -1,14 +1,16 @@
 package main
 
 import (
-	"fmt"
-
+	"bufio"
 	"devops-tools/utils"
+	"fmt"
+	"os"
+	"strconv"
 )
 
 type MenuItem struct {
 	Label  string
-	Action func() error
+	Action func() (*Result, error)
 }
 
 type Menu struct {
@@ -17,8 +19,10 @@ type Menu struct {
 	IsMain bool
 }
 
-func (menu Menu) Run() error {
+func (menu Menu) Run() {
 	for {
+		utils.ClearScreen()
+
 		var labels []string
 
 		for _, item := range menu.Items {
@@ -30,129 +34,151 @@ func (menu Menu) Run() error {
 			labels = append(labels, "Back")
 		}
 
-		choice, err := chooseItem(menu.Label, labels)
-		if err != nil {
-			return err
-		}
+		choice := chooseItemWithRetry(menu.Label, labels)
 
 		if choice == len(labels) {
-			return nil
-		} else {
-			if err := menu.Items[choice-1].Action(); err != nil {
-				utils.PrintError(err.Error())
-			}
+			break
+		}
+
+		result, err := menu.Items[choice-1].Action()
+		if err != nil {
+			utils.PrintError(err.Error())
+			utils.PrintPressEnterToContinue()
+		} else if result != nil {
+			result.Print()
+			utils.PrintPressEnterToContinue()
 		}
 	}
 }
 
-func main() {
-	var menu = Menu{
+type Result struct {
+	Title  string
+	Values []string
+}
+
+func (result Result) Print() {
+	utils.PrintResult(result.Title, result.Values)
+}
+
+var NotImplementedResult = &Result{Title: "Not implemented", Values: []string{}}
+
+var (
+	mainMenu = Menu{
 		Label:  "Main",
 		IsMain: true,
 		Items: []MenuItem{
-			{Label: "ALB", Action: albUtils},
-			{Label: "ECS", Action: ecsUtils},
-			{Label: "EKS", Action: eksUtils},
+			{Label: "ALB", Action: func() (*Result, error) {
+				albMenu.Run()
+				return nil, nil
+			}},
+			{Label: "ECS", Action: func() (*Result, error) {
+				ecsMenu.Run()
+				return nil, nil
+			}},
+			{Label: "EKS", Action: func() (*Result, error) {
+				eksMenu.Run()
+				return nil, nil
+			}},
 		},
 	}
-	menu.Run()
-}
-
-func chooseItem(label string, items []string) (int, error) {
-	for {
-		utils.PrintMenuTitle(label)
-		for idx, item := range items {
-			utils.PrintMenuItem(idx+1, item)
-		}
-
-		var choice int
-		utils.PrintMenuChoice()
-		_, err := fmt.Scanf("%d", &choice)
-
-		if err != nil {
-			utils.PrintError(fmt.Sprintf("Failed scan: %s", err))
-		} else if choice < 1 || choice > len(items) {
-			utils.PrintError(fmt.Sprintf("Invalid choice: %d", choice))
-		} else {
-			return choice, nil
-		}
-	}
-}
-
-func albUtils() error {
-	var menu = Menu{
+	albMenu = Menu{
 		Label:  "ALB",
 		IsMain: false,
 		Items: []MenuItem{
 			{
 				Label: "List ALBs",
-				Action: func() error {
+				Action: func() (*Result, error) {
 					albArns, err := utils.ListAlbArns()
 					if err != nil {
-						return err
+						return nil, err
 					}
-					utils.PrintResultTitle("List of ALBs")
-					for _, albArn := range albArns {
-						utils.PrintResultItem(albArn)
-					}
-					return nil
+					return &Result{Title: "List of ALBs", Values: albArns}, nil
 				},
 			},
 			{
 				Label: "Highest listener rule priority",
-				Action: func() error {
+				Action: func() (*Result, error) {
 					albArns, err := utils.ListAlbArns()
 					if err != nil {
-						return err
+						return nil, err
 					}
-					albChoice, err := chooseItem("Select an ALB", albArns)
-					if err != nil {
-						return err
-					}
+					albChoice := chooseItemWithRetry("Select an ALB", albArns)
 					listenerArns, err := utils.ListAlbListenerArns(albArns[albChoice-1])
 					if err != nil {
-						return err
+						return nil, err
 					}
-					listenerChoice, err := chooseItem("Select a listener", listenerArns)
-					if err != nil {
-						return err
-					}
+					listenerChoice := chooseItemWithRetry("Select a listener", listenerArns)
 					highestPriority, err := utils.HighestAlbListenerRulePriority(listenerArns[listenerChoice-1])
 					if err != nil {
-						return err
+						return nil, err
 					}
-					utils.PrintResultValueInt("Highest listener rule priority", highestPriority)
-					return nil
+					return &Result{Title: "Highest listener rule priority", Values: []string{strconv.Itoa(highestPriority)}}, nil
 				},
 			},
 		},
 	}
-	return menu.Run()
-}
-
-func ecsUtils() error {
-	var menu = Menu{
+	ecsMenu = Menu{
 		Label:  "ECS",
 		IsMain: false,
 		Items: []MenuItem{
-			{Label: "Not implemented", Action: notImplemented},
+			{Label: "ECS clusters", Action: func() (*Result, error) {
+				return NotImplementedResult, nil
+			}},
 		},
 	}
-	return menu.Run()
-}
-
-func eksUtils() error {
-	var menu = Menu{
+	eksMenu = Menu{
 		Label:  "EKS",
 		IsMain: false,
 		Items: []MenuItem{
-			{Label: "Not implemented", Action: notImplemented},
+			{Label: "EKS clusters", Action: func() (*Result, error) {
+				return NotImplementedResult, nil
+			}},
 		},
 	}
-	return menu.Run()
+)
+
+func main() {
+	mainMenu.Run()
 }
 
-func notImplemented() error {
-	utils.PrintWarning("This feature is not implemented yet")
-	return nil
+func chooseItem(label string, items []string) (int, error) {
+	scanner := bufio.NewScanner(os.Stdin)
+
+	utils.PrintMenuTitle(label)
+	for idx, item := range items {
+		utils.PrintMenuItem(idx+1, item)
+	}
+
+	utils.PrintMenuChoice()
+
+	var line string
+	if scanner.Scan() {
+		line = scanner.Text()
+	} else if scanner.Err() != nil {
+		return 0, fmt.Errorf("failed to scan: %s", scanner.Err())
+	} else {
+		return 0, fmt.Errorf("failed to read input")
+	}
+
+	choice, err := strconv.Atoi(line)
+	if err != nil {
+		return 0, fmt.Errorf("bad choice: %s", err)
+	} else if choice < 1 || choice > len(items) {
+		return 0, fmt.Errorf("invalid choice: %d", choice)
+	} else {
+		return choice, nil
+	}
+}
+
+func chooseItemWithRetry(label string, items []string) int {
+	for {
+		choice, err := chooseItem(label, items)
+		if err == nil {
+			return choice
+		} else {
+			utils.PrintError(err.Error())
+			utils.PrintPressEnterToContinue()
+			utils.ClearScreen()
+		}
+	}
 }

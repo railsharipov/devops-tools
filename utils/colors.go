@@ -1,6 +1,10 @@
 package utils
 
 import (
+	"bufio"
+	"os"
+	"strings"
+
 	"github.com/fatih/color"
 )
 
@@ -16,9 +20,10 @@ var (
 	ResultError   = color.New(color.FgRed, color.Bold)
 	ResultSuccess = color.New(color.FgGreen, color.Bold)
 
-	StatusInfo  = color.New(color.FgCyan)
-	StatusWarn  = color.New(color.FgYellow)
-	StatusError = color.New(color.FgRed)
+	StatusInfo     = color.New(color.FgCyan)
+	StatusWarn     = color.New(color.FgYellow)
+	StatusError    = color.New(color.FgRed)
+	StatusContinue = color.New(color.FgHiBlack)
 )
 
 func PrintMenuTitle(title string) {
@@ -34,22 +39,15 @@ func PrintMenuChoice() {
 	MenuChoice.Printf("Choice: ")
 }
 
-func PrintResultTitle(title string) {
-	ResultTitle.Printf("\n%s:\n", title)
-}
-
-func PrintResultItem(item string) {
-	ResultItem.Printf("• %s\n", item)
-}
-
-func PrintResultValue(key, value string) {
-	ResultItem.Printf("%s: ", key)
-	ResultValue.Printf("%s\n", value)
-}
-
-func PrintResultValueInt(key string, value int) {
-	ResultItem.Printf("%s: ", key)
-	ResultValue.Printf("%d\n", value)
+func PrintResult(title string, values []string) {
+	ResultTitle.Printf("%s: ", title)
+	if len(values) == 0 {
+		ResultValue.Printf("No results\n")
+	} else if len(values) == 1 {
+		ResultValue.Printf("%s\n", values[0])
+	} else {
+		ResultValue.Printf("\n%s\n", strings.Join(values, "\n"))
+	}
 }
 
 func PrintError(message string) {
@@ -66,4 +64,9 @@ func PrintInfo(message string) {
 
 func PrintWarning(message string) {
 	StatusWarn.Printf("⚠ %s\n", message)
+}
+
+func PrintPressEnterToContinue() {
+	StatusContinue.Printf("\nPress Enter to continue...")
+	bufio.NewReader(os.Stdin).ReadBytes('\n')
 }
