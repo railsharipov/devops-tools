@@ -121,8 +121,73 @@ var (
 		Label:  "ECS",
 		IsMain: false,
 		Items: []MenuItem{
-			{Label: "ECS clusters", Action: func() (*Result, error) {
-				return NotImplementedResult, nil
+			{Label: "List ECS clusters", Action: func() (*Result, error) {
+				clusterArns, err := utils.ListEcsClusters()
+				if err != nil {
+					return nil, err
+				}
+				return &Result{Title: "List of ECS clusters", Values: clusterArns}, nil
+			}},
+			{Label: "List ECS services", Action: func() (*Result, error) {
+				clusterArns, err := utils.ListEcsClusters()
+				if err != nil {
+					return nil, err
+				}
+				clusterChoice := chooseItemWithRetry("Select a cluster", clusterArns)
+				serviceArns, err := utils.ListEcsServices(clusterArns[clusterChoice-1])
+				if err != nil {
+					return nil, err
+				}
+				return &Result{Title: "List of ECS services", Values: serviceArns}, nil
+			}},
+			{Label: "Restart ECS service", Action: func() (*Result, error) {
+				clusterArns, err := utils.ListEcsClusters()
+				if err != nil {
+					return nil, err
+				}
+				clusterChoice := chooseItemWithRetry("Select a cluster", clusterArns)
+				serviceArns, err := utils.ListEcsServices(clusterArns[clusterChoice-1])
+				if err != nil {
+					return nil, err
+				}
+				serviceChoice := chooseItemWithRetry("Select a service", serviceArns)
+				if confirm(fmt.Sprintf("Are you sure you want to restart the service: %s?", serviceArns[serviceChoice-1])) {
+					return nil, utils.RestartEcsService(clusterArns[clusterChoice-1], serviceArns[serviceChoice-1])
+				}
+				return nil, nil
+			}},
+			{Label: "Rollback ECS service", Action: func() (*Result, error) {
+				clusterArns, err := utils.ListEcsClusters()
+				if err != nil {
+					return nil, err
+				}
+				clusterChoice := chooseItemWithRetry("Select a cluster", clusterArns)
+				serviceArns, err := utils.ListEcsServices(clusterArns[clusterChoice-1])
+				if err != nil {
+					return nil, err
+				}
+				serviceChoice := chooseItemWithRetry("Select a service", serviceArns)
+				if confirm(fmt.Sprintf("Are you sure you want to rollback the service: %s?", serviceArns[serviceChoice-1])) {
+					return nil, utils.RollbackEcsService(clusterArns[clusterChoice-1], serviceArns[serviceChoice-1])
+				}
+				return nil, nil
+			}},
+			{Label: "Get latest ECS service deployment status", Action: func() (*Result, error) {
+				clusterArns, err := utils.ListEcsClusters()
+				if err != nil {
+					return nil, err
+				}
+				clusterChoice := chooseItemWithRetry("Select a cluster", clusterArns)
+				serviceArns, err := utils.ListEcsServices(clusterArns[clusterChoice-1])
+				if err != nil {
+					return nil, err
+				}
+				serviceChoice := chooseItemWithRetry("Select a service", serviceArns)
+				deploymentStatus, err := utils.GetLatestEcsServiceDeploymentStatus(clusterArns[clusterChoice-1], serviceArns[serviceChoice-1])
+				if err != nil {
+					return nil, err
+				}
+				return &Result{Title: "Latest ECS service deployment status", Values: []string{deploymentStatus}}, nil
 			}},
 		},
 	}
@@ -181,4 +246,12 @@ func chooseItemWithRetry(label string, items []string) int {
 			utils.ClearScreen()
 		}
 	}
+}
+
+func confirm(label string) bool {
+	choice, err := chooseItem(label, []string{"Yes", "No"})
+	if err != nil {
+		return false
+	}
+	return choice == 1
 }

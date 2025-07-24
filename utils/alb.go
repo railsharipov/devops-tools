@@ -10,19 +10,19 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 )
 
-var client *elasticloadbalancingv2.Client
+var albClient *elasticloadbalancingv2.Client
 
 func init() {
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-east-1"))
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
-	client = elasticloadbalancingv2.NewFromConfig(cfg)
+	albClient = elasticloadbalancingv2.NewFromConfig(cfg)
 }
 
 func ListAlbArns() ([]string, error) {
 	describeLoadBalancersInput := &elasticloadbalancingv2.DescribeLoadBalancersInput{}
-	describeLoadBalancersOutput, err := client.DescribeLoadBalancers(context.TODO(), describeLoadBalancersInput)
+	describeLoadBalancersOutput, err := albClient.DescribeLoadBalancers(context.TODO(), describeLoadBalancersInput)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func ListAlbListenerArns(albName string) ([]string, error) {
 	describeListenersInput := &elasticloadbalancingv2.DescribeListenersInput{
 		LoadBalancerArn: aws.String(albName),
 	}
-	describeListenersOutput, err := client.DescribeListeners(context.TODO(), describeListenersInput)
+	describeListenersOutput, err := albClient.DescribeListeners(context.TODO(), describeListenersInput)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func HighestAlbListenerRulePriority(listenerArn string) (int, error) {
 	describeRulesInput := &elasticloadbalancingv2.DescribeRulesInput{
 		ListenerArn: aws.String(listenerArn),
 	}
-	describeRulesOutput, err := client.DescribeRules(context.TODO(), describeRulesInput)
+	describeRulesOutput, err := albClient.DescribeRules(context.TODO(), describeRulesInput)
 	if err != nil {
 		return 0, err
 	}
